@@ -160,9 +160,13 @@ reviewer quality:
   network allowlist. It uses full-history fetches, not the benchmark's
   minimised repositories.
 - **Answer leakage.** All 219 pull requests are public, and the golden findings
-  are in this repository. Human review threads and later fix commits exist
-  upstream. A reviewer with network or GitHub access can find the answers
-  instead of the issues. This risk is highest with `--command`, which runs with
-  your credentials and network. Remove the checkout's remotes, withhold GitHub
-  tokens, and keep `golden/` out of the reviewer's reach. Check the reviewer's
-  logs for lookups of the upstream pull request.
+  are in this repository. The upstream pull request's review comments, which
+  are a source of golden findings, are public too, along with later fix
+  commits. A reviewer with network access can look up the answers instead of
+  finding the issues. Reviewers built to read pull request discussions will do
+  this unprompted. One fetched `pulls/<n>/comments` from the unauthenticated
+  GitHub API in our testing, so withholding a GitHub token is not enough.
+  `try-agent.sh` does not restrict the network for either option. Do what the
+  benchmark does: allow outbound traffic only to your model provider. Also keep
+  `golden/` unreadable and remove the checkout's remotes. Then check the
+  reviewer's logs for requests to GitHub.
