@@ -110,6 +110,12 @@ recall to `scoring/my-reviewer.json`. Per-finding decisions go to
 `scoring/my-reviewer.details.json`. See [How to judge findings](JUDGING.md) for
 providers, resuming, and the output fields.
 
+Each judge call has a 10-minute budget, plus 2 minutes per finding for the
+classifier. A slow endpoint or a high `--concurrency` can exceed it, and the
+judge then refuses to write partial results. Raise the budget with
+`REVIEW_BENCH_JUDGE_TIMEOUT_MS` (for example `1800000`) and run the same
+command again. Pull requests that already finished resume from the checkpoint.
+
 ### Use the leaderboard's judge model
 
 The leaderboard is judged by Claude Sonnet 5. The judge model changes the
