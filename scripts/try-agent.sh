@@ -2,36 +2,48 @@
 #
 # Runs your agent image on the test set (or the full set) exactly the way the
 # benchmark does: one fresh container per pull request, the same mounts and
-# variables, and the same checks on the findings file. It does not score; a
-# test run in the portal does that.
+# variables, and the same checks on the findings file. It does not score; run
+# `npm run judge -- --candidate ./findings ...` on the result for that.
 #
 #   scripts/try-agent.sh <image> [--set test|full] [--pr <index>] [-e NAME[=VALUE] ...]
+#   scripts/try-agent.sh --command '<shell command>' [--set test|full] [--pr <index>] [-e NAME=VALUE ...]
 #
 #   scripts/try-agent.sh my-reviewer:dev --pr 0
 #   scripts/try-agent.sh my-reviewer:dev -e OPENAI_API_KEY -e RB_CONFIG_MODEL=gpt-5.5
 #   scripts/try-agent.sh my-reviewer:dev --set full -e OPENAI_API_KEY
+#   scripts/try-agent.sh --command ./my-reviewer.sh --pr 0
 #
 # --set test (the default) runs the 25 pull requests in corpus/test/test.json.
 # --set full runs the full set of 219 in corpus/manifest.json.
+# --command runs a command on this machine instead of a container, from the
+# checkout at head, with the same RB_* variables pointing at host paths.
 #
-# Needs docker, git and jq. Findings land in ./findings/<pr key>.json.
+# Needs git and jq, plus docker for an image. Findings land in ./findings/<pr key>.json.
 set -euo pipefail
 
-usage() { sed -n '8,17p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+usage() { sed -n '8,21p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
 [ $# -ge 1 ] || usage
-image="$1"; shift
+image=""
+command=""
 only=""
 set_name=test
 env_args=()
+host_env=()
 while [ $# -gt 0 ]; do
   case "$1" in
     # Each option takes a value; without one, show the usage instead of an unbound-variable error.
     --set) [ $# -ge 2 ] || usage; set_name="$2"; shift 2 ;;
     --pr) [ $# -ge 2 ] || usage; only="$2"; shift 2 ;;
-    -e) [ $# -ge 2 ] || usage; env_args+=(-e "$2"); shift 2 ;;
-    *) usage ;;
+    --command) [ $# -ge 2 ] || usage; command="$2"; shift 2 ;;
+    # A bare NAME is already in a host command's environment; only NAME=VALUE changes it.
+    -e) [ $# -ge 2 ] || usage; env_args+=(-e "$2"); [[ "$2" == *=* ]] && host_env+=("$2"); shift 2 ;;
+    -*) usage ;;
+    *) [ -z "$image" ] || usage; image="$1"; shift ;;
   esac
 done
+# Exactly one of an image or --command.
+[ -n "$image$command" ] || usage
+[ -z "$image" ] || [ -z "$command" ] || usage
 
 here="$(cd "$(dirname "$0")/.." && pwd)"
 case "$set_name" in
@@ -42,6 +54,7 @@ esac
 work="${TRY_AGENT_WORK:-$PWD/.try-agent}"
 out_dir="$PWD/findings"
 mkdir -p "$work/repos" "$out_dir"
+work="$(cd "$work" && pwd)"
 mirror_org="${MIRROR_ORG:-review-bench}"
 
 has_commits() {
@@ -96,14 +109,25 @@ for i in $indices; do
   jq '{repo, pr_number: (.pr_number | tonumber), base, head, nwo, title, body}' <<<"$entry" > "$pr_dir/pr.json"
 
   status=0
-  docker run --rm --platform linux/amd64 \
-    -v "$repo:/work/repo" -v "$pr_dir:/work/pr:ro" -v "$out:/work/out" \
-    -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
-    -e RB_NWO="$nwo" -e RB_PR_NUMBER="$pr" -e RB_BASE="$base" -e RB_HEAD="$head" \
-    -e RB_AGENT=try-agent -e RB_REPO=/work/repo \
-    -e RB_DIFF=/work/pr/diff.patch -e RB_PR_JSON=/work/pr/pr.json -e RB_OUT=/work/out/findings.json \
-    -e RB_ATTEMPT=1 \
-    "${env_args[@]}" "$image" || status=$?
+  started=$SECONDS
+  if [ -n "$command" ]; then
+    (cd "$repo" && env \
+      RB_NWO="$nwo" RB_PR_NUMBER="$pr" RB_BASE="$base" RB_HEAD="$head" \
+      RB_AGENT=try-agent RB_REPO="$repo" \
+      RB_DIFF="$pr_dir/diff.patch" RB_PR_JSON="$pr_dir/pr.json" RB_OUT="$out/findings.json" \
+      RB_ATTEMPT=1 \
+      ${host_env[@]+"${host_env[@]}"} bash -c "$command") || status=$?
+  else
+    docker run --rm --platform linux/amd64 \
+      -v "$repo:/work/repo" -v "$pr_dir:/work/pr:ro" -v "$out:/work/out" \
+      -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
+      -e RB_NWO="$nwo" -e RB_PR_NUMBER="$pr" -e RB_BASE="$base" -e RB_HEAD="$head" \
+      -e RB_AGENT=try-agent -e RB_REPO=/work/repo \
+      -e RB_DIFF=/work/pr/diff.patch -e RB_PR_JSON=/work/pr/pr.json -e RB_OUT=/work/out/findings.json \
+      -e RB_ATTEMPT=1 \
+      ${env_args[@]+"${env_args[@]}"} "$image" || status=$?
+  fi
+  elapsed_ms=$(( (SECONDS - started) * 1000 ))
 
   file="$out/findings.json"
   if [ "$status" -ne 0 ]; then
@@ -122,7 +146,8 @@ for i in $indices; do
   if [ -n "$problem" ]; then
     echo "   FAIL: $problem" >&2; failed=$((failed + 1)); continue
   fi
-  cp "$file" "$out_dir/$key.json"
+  # The judge reports review duration from usage.time_in_ms; keep the agent's own value if it sets one.
+  jq --argjson ms "$elapsed_ms" '.usage = ({time_in_ms: $ms} + (.usage // {}))' "$file" > "$out_dir/$key.json"
   echo "   ok: $(jq '.findings | length' "$file") finding(s)" >&2
   passed=$((passed + 1))
 done
