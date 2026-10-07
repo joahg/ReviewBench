@@ -176,3 +176,13 @@ reviewer quality:
   benchmark does: allow outbound traffic only to your model provider. Also keep
   `golden/` unreadable and remove the checkout's remotes. Then check the
   reviewer's logs for requests to GitHub.
+
+  An allowlist that admits the model host does not block tools the provider
+  hosts behind it. Hosted web search and connectors such as a GitHub app run
+  through the model host. In our testing, a Codex reviewer whose network was
+  limited to its model host still read upstream review comments through the
+  Codex GitHub connector on about half of the pull requests. Turn these tools
+  off for benchmark runs; for Codex, set `features.apps = false` and
+  `tools.web_search = false` in a dedicated `CODEX_HOME`. Then check the
+  agent's transcripts for connector and web search calls, not only its network
+  log.
