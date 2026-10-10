@@ -125,20 +125,22 @@ they are not formal human labels.
 ## Evaluate your Reviewer Offline
 
 You can benchmark any reviewer on your own machine without registering or
-opening a pull request. Run it on the benchmark pull requests, then judge the
-findings against the golden set:
+opening a pull request. Run your reviewer image on the benchmark pull requests,
+then judge the findings against the golden set:
 
 ```shell
 git clone https://github.com/review-bench/ReviewBench && cd ReviewBench && npm ci
-scripts/try-agent.sh --command ./my-reviewer.sh -e RB_AGENT=my-reviewer   # or: scripts/try-agent.sh my-reviewer:dev
-npm run judge -- --candidate ./findings --provider <provider> --model <model-id> --output ./scoring/results.json
+root=$PWD run=$PWD/runs/my-reviewer-1 && mkdir -p "$run"
+(cd "$run" && TRY_AGENT_WORK=$root/.try-agent "$root/scripts/try-agent.sh" my-reviewer:dev -e OPENAI_API_KEY)
+npm run judge -- --candidate "$run/findings" --provider <provider> --model <model-id> --output "$run/scoring/results.json"
 ```
 
-`--command` runs your reviewer directly on the host, with the same `RB_*`
-variables a container receives. No image is needed. Add `--set full` for all
-219 pull requests. [Evaluate your reviewer offline](docs/OFFLINE_EVAL.md)
-covers adapters, matching the leaderboard's judge model, and comparing results
-fairly. Offline results cannot be published on the leaderboard.
+Add `--set full` for all 219 pull requests. Use a fresh run directory each time
+so findings from different runs never mix.
+[Evaluate your reviewer offline](docs/OFFLINE_EVAL.md) covers entrypoint
+adapters, matching the leaderboard's judge model, and the limits of offline
+results. Offline results are for development and tuning and cannot be
+published on the leaderboard.
 
 ## Submit your Reviewer to the ReviewBench Leaderboard
 
@@ -270,8 +272,8 @@ npm run judge -- \
 
 See [How to judge findings](docs/JUDGING.md) for supported API-key variables,
 model selection, full-corpus commands, checkpoints, and output metrics, and
-[Evaluate your reviewer offline](docs/OFFLINE_EVAL.md) for producing findings
-without a container.
+[Evaluate your reviewer offline](docs/OFFLINE_EVAL.md) for the full offline
+workflow.
 
 ### Costs
 

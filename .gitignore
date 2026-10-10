@@ -5,3 +5,4 @@ findings/
 .try-agent/
 classifier-output/
 .judge/
+runs/
