@@ -1,13 +1,14 @@
 # ReviewBench
 [![License: MIT](https://img.shields.io/badge/License-MIT-000000?style=for-the-badge)](LICENSE)
 
-ReviewBench is an open, reproducible benchmark for evaluating AI code review systems on real-world pull requests developed by GitHub Inc.
+ReviewBench, developed by GitHub, is an open, reproducible benchmark for evaluating AI code review systems on real-world pull requests.
 
 For each pull request, the benchmark provides a human-reviewed golden set of code review findings that serves as the ground truth. ReviewBench compares an agent's findings with this reference set to measure how reliably it identifies useful issues while avoiding false positives. Results can also be explored by dimensions such as severity and category.
 
 ## Table of Contents
 
 - [What is in the Repository?](#what-is-in-the-repository)
+- [Evaluate your Reviewer Offline](#evaluate-your-reviewer-offline)
 - [Submit your Reviewer to the ReviewBench Leaderboard](#submit-your-reviewer-to-the-reviewbench-leaderboard)
   - [1. Validate your submission locally](#1-validate-your-submission-locally)
   - [2. Onboard through the self-service portal](#2-onboard-through-the-self-service-portal)
@@ -41,9 +42,8 @@ For each pull request, the benchmark provides a human-reviewed golden set of cod
 - **[The classifier prompt and supporting script](scripts/classifier/prompts.ts).**
   The classifier artifacts used to assign severity and category labels are
   published so the labeling process can be inspected and reproduced.
-- **[The judging CLI](#optional-judge-your-own-findings-locally-for-tuning).**
-  Privately score already-normalized findings for tuning with an LLM judge you
-  choose.
+- **[The judging CLI](#evaluate-your-reviewer-offline).**
+  Privately score findings for tuning with an LLM judge you choose.
 
 The full corpus manifest and all golden findings are public.
 
@@ -137,6 +137,25 @@ findings labeled TP.
 
 See [Golden Set Composition by Producer](docs/METHODOLOGY.md#55-golden-set-composition-by-producer)
 for per-producer counts, TP rates, and high- and medium-severity shares.
+## Evaluate your Reviewer Offline
+
+You can benchmark any reviewer on your own machine without registering or
+opening a pull request. Run your reviewer image on the benchmark pull requests,
+then judge the findings against the golden set:
+
+```shell
+git clone https://github.com/review-bench/ReviewBench && cd ReviewBench && npm ci
+root=$PWD run=$PWD/runs/my-reviewer-1 && mkdir -p "$run"
+(cd "$run" && TRY_AGENT_WORK=$root/.try-agent "$root/scripts/try-agent.sh" my-reviewer:dev -e OPENAI_API_KEY)
+npm run judge -- --candidate "$run/findings" --provider <provider> --model <model-id> --output "$run/scoring/results.json"
+```
+
+Add `--set full` for all 219 pull requests. Use a fresh run directory each time
+so findings from different runs never mix.
+[Evaluate your reviewer offline](docs/OFFLINE_EVAL.md) covers entrypoint
+adapters, matching the leaderboard's judge model, and the limits of offline
+results. Offline results are for development and tuning and cannot be
+published on the leaderboard.
 
 ## Submit your Reviewer to the ReviewBench Leaderboard
 
@@ -212,7 +231,9 @@ choose "private package" and the website adds `GHCR_PULL_TOKEN` to the secret
 names for you; see [private images](docs/ONBOARDING.md#public-or-private).
 
 The website opens an onboarding pull request in this repository for you. It
-adds a manifest under [`agents/`](agents/) that follows
+stores your contact email privately; it is not written to the pull request.
+The pull request adds a manifest under
+[`agents/`](agents/) that follows
 [the schema](schema/agent-manifest.schema.json); CI validates it with
 [`schema/validate-manifest.mjs`](schema/validate-manifest.mjs). A maintainer
 merges it. You do not write the manifest or open the pull request yourself.
@@ -267,7 +288,9 @@ npm run judge -- \
 ```
 
 See [How to judge findings](docs/JUDGING.md) for supported API-key variables,
-model selection, full-corpus commands, checkpoints, and output metrics.
+model selection, full-corpus commands, checkpoints, and output metrics, and
+[Evaluate your reviewer offline](docs/OFFLINE_EVAL.md) for the full offline
+workflow.
 
 ### Costs
 
