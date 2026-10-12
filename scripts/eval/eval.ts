@@ -60,7 +60,7 @@ import { prKey } from "../lib/types.js";
 import { aggregateCandidateUsage } from "../lib/usage.js";
 import { checkpointFingerprint } from "./checkpoint-fingerprint.js";
 import { outputSidecarPath } from "./output-paths.js";
-import { excludeGoldenProducers, normalizeProducerPrefixes } from "./exclude-producers.js";
+import { excludeGoldenProducers, goldenHashText, normalizeProducerPrefixes } from "./exclude-producers.js";
 
 // ---------------------------------------------------------------------------
 // Detailed per-finding output
@@ -241,11 +241,12 @@ class GoldenStore {
     return this.parsed.get(key) ?? null;
   }
 
-  /** The file text as loaded, or the remaining findings when producers are excluded, for hashing. */
+  /** The file text as loaded, or the remaining findings when an exclusion removed any, for hashing. */
   text(key: string): string | undefined {
-    if (this.excludedProducers.length === 0) return this.raw.get(key);
+    const raw = this.raw.get(key);
     const golden = this.parsed.get(key);
-    return golden ? JSON.stringify(golden) : this.raw.get(key);
+    if (raw === undefined || !golden) return raw;
+    return goldenHashText(raw, { golden, excluded: this.excludedCounts.get(key) ?? 0 });
   }
 
   /** Remove the loaded files from disk; the store keeps serving them. */

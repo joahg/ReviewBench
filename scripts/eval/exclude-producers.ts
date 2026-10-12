@@ -30,3 +30,11 @@ export function excludeGoldenProducers(
     excluded: golden.findings.length - findings.length,
   };
 }
+
+/**
+ * The golden file content to hash: the file as loaded unless an exclusion
+ * actually removed a finding, so a no-op exclusion keeps the unfiltered hash.
+ */
+export function goldenHashText(raw: string, filtered: { golden: GoldenSet; excluded: number } | null): string {
+  return filtered && filtered.excluded > 0 ? JSON.stringify(filtered.golden) : raw;
+}

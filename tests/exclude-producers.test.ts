@@ -4,6 +4,7 @@ import test from "node:test";
 import { checkpointFingerprint } from "../scripts/eval/checkpoint-fingerprint.js";
 import {
   excludeGoldenProducers,
+  goldenHashText,
   isExcludedProducer,
   normalizeProducerPrefixes,
 } from "../scripts/eval/exclude-producers.js";
@@ -133,4 +134,13 @@ test("checkpoint fingerprint changes with producer exclusions and is unchanged w
   assert.notEqual(excluded, fingerprint);
   assert.notEqual(checkpointFingerprint({ ...base, excludedProducers: ["llm_review:"] }), excluded);
   assert.equal(checkpointFingerprint({ ...base, excludedProducers: ["b", "a"] }), checkpointFingerprint({ ...base, excludedProducers: ["a", "b"] }));
+});
+
+test("goldenHashText keeps the file as loaded unless an exclusion removed a finding", () => {
+  const raw = JSON.stringify(golden, null, 2);
+  assert.equal(goldenHashText(raw, excludeGoldenProducers(golden, ["no_such_producer:"])), raw);
+  assert.equal(goldenHashText(raw, excludeGoldenProducers(golden, [])), raw);
+  const filtered = excludeGoldenProducers(golden, ["ccr:"]);
+  assert.equal(goldenHashText(raw, filtered), JSON.stringify(filtered.golden));
+  assert.equal(goldenHashText(raw, null), raw);
 });
