@@ -41,6 +41,7 @@ test("normalizeProducerPrefixes sorts, de-duplicates, and rejects empty prefixes
   assert.deepEqual(normalizeProducerPrefixes([]), []);
   assert.throws(() => normalizeProducerPrefixes([""]), /non-empty/);
   assert.throws(() => normalizeProducerPrefixes(["  "]), /non-empty/);
+  assert.throws(() => normalizeProducerPrefixes(["--ingest"]), /got the option --ingest/);
 });
 
 test("isExcludedProducer matches producer prefixes only", () => {

@@ -1,10 +1,17 @@
 import type { GoldenSet } from "../golden/pipeline.js";
 
-/** Sorted, de-duplicated prefixes; throws on an empty prefix, which would exclude every finding. */
+/**
+ * Sorted, de-duplicated prefixes. Throws on an empty prefix, which would
+ * exclude every finding, and on an option-shaped one, which means the value
+ * was missing and the parser consumed the next flag.
+ */
 export function normalizeProducerPrefixes(prefixes: readonly string[]): string[] {
   for (const prefix of prefixes) {
     if (!prefix || !prefix.trim()) {
       throw new Error("--exclude-producer requires a non-empty producer prefix");
+    }
+    if (prefix.startsWith("-")) {
+      throw new Error(`--exclude-producer requires a producer prefix, got the option ${prefix}`);
     }
   }
   return [...new Set(prefixes)].sort();
