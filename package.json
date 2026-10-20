@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "judge": "tsx scripts/eval/eval.ts",
+    "harbor:export": "tsx scripts/harbor/export.ts",
+    "harbor:validate-findings": "tsx scripts/harbor/validate-findings.ts",
     "sync:test-set": "tsx scripts/sync-test-set.ts",
     "check:test-set": "tsx scripts/sync-test-set.ts --check",
     "check:golden": "tsx scripts/validate-golden.ts",
@@ -16,7 +18,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "^0.74.0"
+    "@earendil-works/pi-coding-agent": "0.75.5"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",

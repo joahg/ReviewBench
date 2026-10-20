@@ -29,6 +29,7 @@
  *   --exclude-producer <prefix>
  *                        Drop golden findings whose producer starts with <prefix>
  *                        before matching and scoring (repeatable; see docs/JUDGING.md)
+ *   --snapshot-dir <path> Trusted frozen checkout for a single-PR evaluation; no fetch
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "fs";
@@ -61,6 +62,7 @@ import { aggregateCandidateUsage } from "../lib/usage.js";
 import { checkpointFingerprint } from "./checkpoint-fingerprint.js";
 import { outputSidecarPath } from "./output-paths.js";
 import { excludeGoldenProducers, goldenHashText, normalizeProducerPrefixes } from "./exclude-producers.js";
+import { validateSnapshot } from "../extraction/git.js";
 
 // ---------------------------------------------------------------------------
 // Detailed per-finding output
@@ -113,6 +115,7 @@ interface CliArgs {
   modelId: string;
   repoDir: string;
   excludeProducers: string[];
+  snapshotDir?: string;
 }
 
 function parseArgs(): CliArgs {
@@ -176,6 +179,10 @@ function parseArgs(): CliArgs {
         break;
       case "--exclude-producer":
         opts.excludeProducers.push(args[++i] ?? "");
+        break;
+      case "--snapshot-dir":
+        opts.snapshotDir = args[++i];
+        if (!opts.snapshotDir) throw new Error("--snapshot-dir requires a path");
         break;
       default:
         console.error(`Unknown argument: ${args[i]}`);
@@ -460,6 +467,7 @@ async function evalPR(
           prBody: manifestEntry.body,
           findings: unmatchedFindings,
           repoBaseDir: opts.repoDir,
+          snapshotDir: opts.snapshotDir,
           signal,
           config: {
             provider: opts.provider,
@@ -757,6 +765,11 @@ async function main() {
     }
     console.log(`  Excluded producers: ${opts.excludeProducers.join(", ")}`);
     console.log(`  Golden findings excluded: ${excluded} (${emptied} PRs left with no golden findings)`);
+  }
+  if (opts.snapshotDir) {
+    if (commonKeys.length !== 1) throw new Error("--snapshot-dir requires exactly one PR");
+    const candidate = candidateByPR.get(commonKeys[0])!;
+    validateSnapshot(opts.snapshotDir, candidate.pr.base, candidate.pr.head);
   }
   console.log(`  Concurrency: ${opts.concurrency}`);
   console.log(`\n${commonKeys.length} PRs to evaluate\n`);

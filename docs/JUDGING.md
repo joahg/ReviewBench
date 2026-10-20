@@ -205,3 +205,12 @@ How to read the results:
 Compare a leave-producer-out run with an unfiltered run that uses the same
 judge model, candidate findings, and PR set. These numbers are a diagnostic and
 are not comparable to leaderboard results, which always use the full golden set.
+
+## Frozen local snapshots
+
+For single-PR integrations such as the [Harbor adapter](HARBOR.md), pass
+`--snapshot-dir <path>` to use an already materialized, trusted checkout instead
+of the mirror cache. The checkout must be at the exact candidate HEAD, contain
+the base commit and merge base, and have no modified, untracked, or ignored
+files. This mode never fetches or clones and rejects evaluations selecting
+more than one PR. Do not point it at a reviewer-modified checkout.

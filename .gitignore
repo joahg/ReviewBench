@@ -6,3 +6,7 @@ findings/
 classifier-output/
 .judge/
 runs/
+.harbor/
+build/
+*.egg-info/
+__pycache__/
